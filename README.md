@@ -1,14 +1,14 @@
 # **Biofilm Analyzing Software (BAS)**
 
-BAS is a Python-based program for an exploratory analysis of digital images from biofilm growth experiments.
+BAS is a Python-based program for exploratory analysis of digital images from biofilm growth experiments.
 
 **Installation**
 
-Download the .exe file that corresponds to your OS. 
+Download [here](https://drive.google.com/file/d/1fKPA34Y4yr1Rly8iVG5gyci7LnX97vhY/view?usp=sharing) the .exe file that corresponds to your OS. 
 
 **Pre-Usage**
 
-You should always arrange your experiment files in 2 folders: Biofilm and Reference. This will allow the program to function correctly.
+You should always arrange your images from experiments in 2 folders: Biofilm and Reference. This will allow the program to identify them and function correctly.
 
 **Usage**
 
@@ -22,8 +22,8 @@ Typical usage should be as follows:
 **Functionalities**
 
 - Image segmentation
-- Filter selection: Gray scale and Green channel
-- Biofilm quatification based on Thresholding Method
+- Filter selection: Grayscale and Green channel
+- Biofilm quantification based on a Thresholding Method
 - Descriptive Statistics of Biofilm images
 
 **Authors**
