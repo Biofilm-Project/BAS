@@ -68,7 +68,7 @@ class InitialWindow(QtWidgets.QMainWindow):
         self.setFixedWidth(900)
         self.setFixedHeight(760)
         
-        self.setWindowIcon(QtGui.QIcon(os.path.join(location, 'welcome_log2.jpeg')))
+        self.setWindowIcon(QtGui.QIcon(os.path.join(location, 'welcome_log2.png')))
         self.setWindowTitle('Biofilm Analysis Software')
     
     def create_file(self):
@@ -430,12 +430,12 @@ class WelcomeDialog(QtWidgets.QDialog):
     def __init__(self, parent = None, *args, **kwargs):
         super().__init__(parent)
         location = os.path.dirname(os.path.realpath(__file__))
-        self.setWindowIcon(QtGui.QIcon(os.path.join(location, 'welcome_log2.jpeg')))
+        self.setWindowIcon(QtGui.QIcon(os.path.join(location, 'welcome_log2.png')))
         self.setWindowTitle('Welcome')
         
         # Add the logo to the message box
         logo_label = QtWidgets.QLabel()
-        logo_pixmap = QtGui.QPixmap(os.path.join(location, 'welcome_log2.jpeg'))  # Replace "path/to/your/logo.png" with the actual path to your logo
+        logo_pixmap = QtGui.QPixmap(os.path.join(location, 'welcome_log2.png'))  # Replace "path/to/your/logo.png" with the actual path to your logo
         logo_label.setPixmap(logo_pixmap)
         logo_label.setAlignment(QtCore.Qt.AlignCenter)
 
@@ -684,8 +684,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.export_name = filename
         self.new_file = None
-        self.df = pd.read_csv(self.export_name)
         
+        try:
+            self.df = pd.read_csv(self.export_name)
+        except:
+            self.df = None
         self.welcome_dialog = None
 
         self.export_list = list()
@@ -826,7 +829,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.widget.setLayout(self.layout)
         self.setCentralWidget(self.widget)
         
-        self.setWindowIcon(QtGui.QIcon(os.path.join(location, 'welcome_log2.jpeg')))
+        self.setWindowIcon(QtGui.QIcon(os.path.join(location, 'welcome_log2.png')))
         self.setWindowTitle('Biofilm Analysis Software')
 
         #self.setFixedHeight(840)
@@ -1221,15 +1224,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self.df.to_csv(self.export_name, index=False, header=True)
 
         if self.initial_round == True:
-            QtWidgets.QMessageBox.about(self,"Notification","The file have been exported, is located in the executable folder"
-                                        +"\n"+"It follows this format: Experiment_folder_name + _results.csv"
+            QtWidgets.QMessageBox.about(self,"Notification","The file have been exported"+
                                         "\n"+"Overwrites any other file with the same filename, be careful.")
             self.initial_round == False
     def show_dataframe(self):
-
-        self.table_window = TableWindow(self.df)
-        self.table_window.show()
-        
+        try:
+            self.table_window = TableWindow(self.df)
+            self.table_window.show()
+        except:
+            pass
     
     def update_image_label(self, file, ref=False):
         '''
