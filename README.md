@@ -4,7 +4,7 @@ BAS is a Python-based program for exploratory analysis of digital images from bi
 
 **Installation**
 
-Download [here](https://drive.google.com/file/d/13WwvfSGp9QZNrNeUd8BPBtUE0wKLZj1r/view?usp=sharing) the .exe file that corresponds to your OS. 
+Download [here](https://drive.google.com/drive/folders/1bRJoWLFFkPUWixwjTFcUCSbRtmU6VWfO?usp=sharing) the .exe file that corresponds to your OS. 
 
 **Pre-Usage**
 
