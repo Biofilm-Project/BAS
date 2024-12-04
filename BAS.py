@@ -17,58 +17,233 @@ from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
 plt.style.use('ggplot')
 
-def selection(image, idd):
-    '''
-    Function to perform the manual crop in the image.
-
-    This crop has a circular shape as the ROI has that shape.
-    You select the borders of the ROI, and this function
-    obtains the coordinates of the selected radius. 
+class InitialWindow(QtWidgets.QMainWindow):
+    signal = QtCore.pyqtSignal(str)
     
-    '''
-    img=image
-    #screen_res = 1280.,720.
-    #scale_width = screen_res[0]/img.shape[1]
-    #scale_height = screen_res[1]/img.shape[0]
-    #scale = min(scale_width, scale_height)
-    #window_height = int(img.shape[1]*scale)
-    #window_width = int(img.shape[0]*scale)
+    def __init__(self, *args, **kwargs):
     
-    #cv2.resizeWindow('Choose Well', window_width, window_height)
-    
-
-    if idd == 0:
-        cv2.resizeWindow('Reference Well', (1280,720))
-        cv2.namedWindow('Reference Well', cv2.WINDOW_NORMAL)
-        imS = cv2.resize(img, (1280,720))
-        r = cv2.selectROI("Reference Well",img)
+        super().__init__(*args, **kwargs)
         
-    else:
-        cv2.resizeWindow('Growth Well', (1280, 720))
-        cv2.namedWindow('Growth Well', cv2.WINDOW_NORMAL)
-        imS = cv2.resize(img, (1280,720))
-        r = cv2.selectROI('Growth Well', img) #[Top_X, Top_Y, Bottom_X, Bottom_Y]
+        location = os.path.dirname(os.path.realpath(__file__))
+        self.selected_file = None
+        myQWidget = QtWidgets.QWidget()
+        
+        self.pix_map = QtGui.QPixmap(os.path.join(location, 'welcome_log2.jpeg'))
+        
+        self.image_label = QtWidgets.QLabel("")
+        self.image_label.setPixmap(self.pix_map)
+        self.image_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        
+        self.app_label = QtWidgets.QLabel("B.A.S")
+        self.app_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.app_label.setFont(QtGui.QFont('Arial', 64, QtGui.QFont.Bold))
+        
+        self.new_button = QtWidgets.QPushButton("Start new csv file")
+        self.new_button.setToolTip('Select a directory where to position the results.')
+        
+        self.load_button = QtWidgets.QPushButton("Load csv file")
+        self.load_button.setToolTip("Select a previously generated csv file to continue modifying it.")
+        
+        root_layout = QtWidgets.QVBoxLayout()
+        second_row  = QtWidgets.QHBoxLayout()
+        new_layout  = QtWidgets.QHBoxLayout()
+        load_layout = QtWidgets.QHBoxLayout()
+        
+        myQWidget.setLayout(root_layout)
+        self.setCentralWidget(myQWidget)
+        
+        new_layout.addWidget(self.new_button)
+        load_layout.addWidget(self.load_button)
+        
+        second_row.addLayout(new_layout)
+        second_row.addLayout(load_layout)
+        
+        root_layout.addWidget(self.image_label, stretch = 2)
+        root_layout.addWidget(self.app_label, stretch = 1)
+        root_layout.addLayout(second_row, stretch = 4)
+        
+        self.new_button.clicked.connect(self.create_file)
+        self.load_button.clicked.connect(self.choose_file)
+        
+        self.setFixedWidth(900)
+        self.setFixedHeight(760)
+        
+        self.setWindowIcon(QtGui.QIcon(os.path.join(location, 'welcome_log2.png')))
+        self.setWindowTitle('Biofilm Analysis Software')
+    
+    def create_file(self):
+        file_path = ''
+        file_dialog = QtWidgets.QFileDialog(self)
+        file_dialog.setAcceptMode(QtWidgets.QFileDialog.AcceptSave)
+        file_dialog.setNameFilter("CSV files (*.csv)")
+        file_dialog.setDefaultSuffix("csv")
+        file_dialog.setViewMode(QtWidgets.QFileDialog.Detail)
+        
+        if file_dialog.exec_():
+            file_path = file_dialog.selectedFiles()[0]
+            with open(file_path, 'w', newline='') as csvfile:
+                # You can write header if needed
+                # csv_writer = csv.writer(csvfile)
+                # csv_writer.writerow(['Column1', 'Column2', 'Column3'])
+                pass
+            #print(f"CSV file created: {file_path}")
+        
+        if file_path!='':
+            self.selected_file = file_path
+            self.signal.emit('Open SecondWindow')
+            self.close()
+    
+    def choose_file(self):
+        file, _ = QtWidgets.QFileDialog.getOpenFileName(self, 'Select a file',
+                                                        os.path.dirname(os.path.abspath(__file__)),
+                                                        "Comma-separated values (*.csv)")
+        
+        if file !='':
+            self.selected_file = file
+            self.signal.emit('Open SecondWindow')
+            self.close()
 
+class ScreenHandler(QtWidgets.QMainWindow):
+    '''
+    Class that handles interaction in between screens, sending signals according to the interaction
+    the user had with the GUI.
+    '''
+    def __init__(self):
+        super().__init__()
+        self.first_window = InitialWindow()
+        self.second_window = None
+        self.first_window.signal.connect(self.change_window)
+        self.first_window.show()
+    
+    @QtCore.pyqtSlot(str)
+    def change_window(self, event):
+        '''
+        Function to differentiate each possible case the user can have when interacting with the
+        program.
+        ''' 
+        if event == 'Open SecondWindow':
+            self.second_window = MainWindow(self.first_window.selected_file) #add the selected file
+            self.second_window.signal.connect(self.change_window)
+            self.second_window.setStyleSheet("QMainWindow { border: 1px solid black; }")
+            self.second_window.show()
+            
+        elif event == 'Change SecondWindow file':
+            new_file = self.second_window.new_file
+            self.second_window = MainWindow(new_file)
+            self.second_window.setStyleSheet("QMainWindow { border: 1px solid black; }")
+            self.second_window.show()
 
-    #print(r)
-    #print(cv2.resize(r, (img.shape[0], img.shape[1])))
-    #r = [0,0,0,0]
-    #
-    #print(r)
-    cropped = img[int(r[1]):int(r[1]+r[3]), int(r[0]):int(r[0]+r[2])]
-    mask = np.zeros((cropped.shape[0],cropped.shape[1]), dtype = np.uint8)
-    shapes = cropped.shape
-    center = (int(shapes[1]/2) , int(shapes[0]/2))
-    rad = int(shapes[1]/2)
-    cv2.destroyAllWindows()
-    blank_circle = cv2.circle(mask, center, rad, (255,0,0), -1)
-    result = cv2.bitwise_and(cropped, cropped, mask= mask)
-    return result
+class ROIWindow(QtWidgets.QMainWindow):
+    
+    window_closed = QtCore.pyqtSignal()
+    coordinates_changed = QtCore.pyqtSignal(QtCore.QRect, bool, int)
+    def __init__(self, image_path: str, crosshair_flag: bool, window_title: str, idd: int):
+        super().__init__()
+
+        self.setWindowTitle(window_title)
+        
+        self.img_path = image_path
+        
+        self.mouse_position = QtCore.QPoint(0, 0)
+        self.start_point = QtCore.QPoint(0, 0)
+        self.end_point = QtCore.QPoint(0, 0)
+        self.drawing_square = False
+        self.last_rectangle = None
+        self.draw_crosshair = crosshair_flag
+        self.idd = idd
+        
+        self.normal_pen = QtGui.QPen(QtCore.Qt.blue, 2, QtCore.Qt.SolidLine)
+        self.dashed_pen = QtGui.QPen(QtCore.Qt.red, 2, QtCore.Qt.DashLine)
+        
+        self.setMouseTracking(True)
+        location = os.path.dirname(os.path.realpath(__file__))
+        self.setWindowIcon(QtGui.QIcon(os.path.join(location, 'welcome_log2.png')))
+        
+        img = QtGui.QImage(self.img_path)
+        width = img.width()
+        height= img.height()
+        print('Image dimensions(H,W):', (height,width))
+        self.setGeometry(100, 100, width, height)
+
+    def paintEvent(self, event):
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        
+        # Draw background image
+        background_image = QtGui.QPixmap(self.img_path)
+        painter.drawPixmap(0, 0, self.width(), self.height(), background_image)
+
+        # Draw vertical line
+        painter.setPen(self.dashed_pen)
+        painter.drawLine(self.mouse_position.x(), 0, self.mouse_position.x(), self.height())
+
+        # Draw horizontal line
+        painter.drawLine(0, self.mouse_position.y(), self.width(), self.mouse_position.y())
+        
+        if self.last_rectangle:
+            painter.setPen(self.normal_pen)
+            painter.drawRect(self.last_rectangle)
+            
+            if self.draw_crosshair:
+                # Draw crosshair
+                center_x = (self.start_point.x() + self.end_point.x()) // 2
+                center_y = (self.start_point.y() + self.end_point.y()) // 2
+                painter.drawLine(center_x, self.start_point.y(), center_x, self.end_point.y())
+                painter.drawLine(self.start_point.x(), center_y, self.end_point.x(), center_y)
+        
+        # Draw square
+        if self.drawing_square:
+            painter.setPen(self.normal_pen)
+            square_rect = QtCore.QRect(self.start_point, self.end_point)
+            painter.drawRect(square_rect)
+            
+            if self.draw_crosshair:
+                # Draw crosshair
+                center_x = (self.start_point.x() + self.end_point.x()) // 2
+                center_y = (self.start_point.y() + self.end_point.y()) // 2
+                painter.drawLine(center_x, self.start_point.y(), center_x, self.end_point.y())
+                painter.drawLine(self.start_point.x(), center_y, self.end_point.x(), center_y)
+
+    def mousePressEvent(self, event):
+        if event.button() == QtCore.Qt.LeftButton:
+            self.start_point = event.pos()
+            self.end_point = event.pos()
+            self.last_rectangle = None
+            self.drawing_square = True
+            self.update()
+
+    def mouseMoveEvent(self, event):
+        self.mouse_position = event.pos()
+        if self.drawing_square:
+            self.end_point = event.pos()
+        self.update()
+            
+    def mouseReleaseEvent(self, event):
+        if event.button() == QtCore.Qt.LeftButton:
+            self.end_point = event.pos()
+            self.drawing_square = False
+            self.last_rectangle = QtCore.QRect(self.start_point, self.end_point)
+            
+            self.update()
+            
+    def keyPressEvent(self, event):
+        if event.key() == QtCore.Qt.Key_Return or event.key() == QtCore.Qt.Key_Enter:
+            #if self.last_rectangle:
+            #    print('Top-left coordinates:', self.last_rectangle.topLeft())
+            #    print("Bottom-right coordinates:", (self.last_rectangle.x()+self.last_rectangle.width(), self.last_rectangle.y()+self.last_rectangle.height()))
+            
+            if self.last_rectangle is not None:
+                self.coordinates_changed.emit(self.last_rectangle, self.draw_crosshair, self.idd)
+                self.close()
+    
+    def closeEvent(self, event):
+        self.window_closed.emit()
+        event.accept()
 
 def nothing(x):
     pass
 
-def manual_thresh(image):
+def manual_thresh(image: np.ndarray) -> int:
     '''
     Function to create the window for the manual thresh selection
 
@@ -92,26 +267,9 @@ def manual_thresh(image):
     plt.hist(image.ravel(), 256, [0,256])
     plt.axvline(thresh, color = 'k', linestyle= 'dashed', linewidth=1)
     plt.show()
-    #print("Pre-acá")
     thresh = cv2.getTrackbarPos('Threshold','Trackbar')
     cv2.destroyAllWindows()
-    #print("Acá")
     return thresh
-
-def show_image(img):
-    '''
-    Function to show an image with a resolution of 1280x720 pixels
-    '''
-    
-    screen_res = 1280.,720.
-    scale_width = screen_res[0]/img.shape[1]
-    scale_height = screen_res[1]/img.shape[0]
-    scale = min(scale_width, scale_height)
-    window_height = int(img.shape[1]*scale)
-    window_width = int(img.shape[0]*scale)
-    cv2.namedWindow('Biofilm Image', cv2.WINDOW_NORMAL)
-    cv2.resizeWindow('Biofilm Image', window_width, window_height)
-    cv2.imshow('Biofilm Image', img)
 
 class MplCanvas(FigureCanvasQTAgg):
     #MplCanvas is a class that contains all the attributes related to the
@@ -131,7 +289,7 @@ class SliderWindow(QtWidgets.QMainWindow):
     #SliderWindow is a class that containts all the attributes related to the
     #window created during the threshold selection. This window contains
     #a canvas, an slider and an input box.
-    def __init__(self, image, color, *args, **kwargs):
+    def __init__(self, image: np.ndarray, color: str, *args, **kwargs):
         '''
         During the initilization, this class creates all the necessary attributes
         and acommodates the layout to show all the information in order.
@@ -140,6 +298,8 @@ class SliderWindow(QtWidgets.QMainWindow):
         self.image = image
         self.label = QtWidgets.QLabel()
         self.button = QtWidgets.QPushButton("Confirm Threshold")
+        self.recommended_label = QtWidgets.QLabel("Recommended Thresh: " + str(np.floor(np.percentile(self.image[self.image>0],0.05))))
+        #self.recommended_label.setAlignment(QtCore.AlignHCenter)
         self.layout = QtWidgets.QVBoxLayout()
         self.top_layout = QtWidgets.QHBoxLayout()
         self.slider = QtWidgets.QSlider()
@@ -150,11 +310,17 @@ class SliderWindow(QtWidgets.QMainWindow):
         self.slider.setSingleStep(1)
         self.user_input = QtWidgets.QLineEdit("", self)
         self.enter = QtWidgets.QPushButton("Draw Line")
-        self.onlyInt = QtGui.QIntValidator()
+        self.onlyInt = QtGui.QIntValidator(0,255, self)
         self.user_input.setValidator(self.onlyInt)
         self.canvas = MplCanvas(self, dpi=100)
         self.slider_value = None
         self.color = color
+
+        self.middle_layout = QtWidgets.QHBoxLayout()
+
+        self.middle_layout.addWidget(self.recommended_label)
+        self.middle_layout.setAlignment(QtCore.Qt.AlignCenter)
+        #self.middle_layout.addStretch()
 
         self.top_layout.addStretch(3)
         self.top_layout.addWidget(self.label)
@@ -165,7 +331,11 @@ class SliderWindow(QtWidgets.QMainWindow):
         
         self.layout.addLayout(self.top_layout)
         self.layout.addWidget(self.slider)
+        self.layout.addStretch()
+        self.layout.addLayout(self.middle_layout)
+        self.layout.addStretch()
         self.layout.addWidget(self.canvas)
+        self.layout.setAlignment(QtCore.Qt.AlignHCenter)
 
         self.widget = QtWidgets.QWidget()
         self.widget.setLayout(self.layout)
@@ -173,11 +343,23 @@ class SliderWindow(QtWidgets.QMainWindow):
         
         self.slider.valueChanged.connect(self.set_line)
         self.button.clicked.connect(self.set_thresh)
-        self.enter.clicked.connect(self.draw_line)
+        self.enter.clicked.connect(lambda ch, p=0: self.draw_line(p))
+        self.user_input.returnPressed.connect(self.on_space_pressed)
+        #self.user_input.returnPressed.connect(lambda:self.draw_line2())
         self.setWindowTitle("Select Threshold")
         self.show_histogram()
         self.show()
-        
+    
+    def on_space_pressed(self):
+        thresh = int(self.user_input.text())
+        img = np.array(self.image)
+        self.canvas.fig.clf()
+        self.canvas.ax1 = self.canvas.fig.add_subplot(111)
+        vals, bins, _ = self.canvas.ax1.hist(img.flatten(),256, [1,255])
+        self.canvas.ax1.axvline(thresh, color = 'k', linestyle= 'dashed', linewidth=1)
+        self.canvas.draw()
+        self.slider.setSliderPosition(thresh)
+        #self.draw_line(0)
 
     def show_histogram(self):
         '''
@@ -205,21 +387,26 @@ class SliderWindow(QtWidgets.QMainWindow):
         self.canvas.ax1.axvline(int(self.slider.value()), color = 'k', linestyle= 'dashed', linewidth=1)
         self.canvas.draw()
 
-    def draw_line(self):
+    def draw_line(self, idx: int):
         '''
         This function draws a vertical line when the user uses the input box
         is an alternative way of showing the threshold.
         '''
-        value = int(self.user_input.text())
-        img = np.array(self.image)
-        self.canvas.fig.clf()
-        self.canvas.ax1 = self.canvas.fig.add_subplot(111)
-        vals, bins, _ = self.canvas.ax1.hist(img.flatten(),256, [1,255])
-        self.canvas.ax1.axvline(value, color = 'k', linestyle= 'dashed', linewidth=1)
-        self.canvas.draw()
-        self.slider.setSliderPosition(value)
-
-    def set_thresh(self):
+        try:
+            print(idx)
+            value = int(self.user_input.text())
+            print(value)
+            img = np.array(self.image)
+            self.canvas.fig.clf()
+            self.canvas.ax1 = self.canvas.fig.add_subplot(111)
+            vals, bins, _ = self.canvas.ax1.hist(img.flatten(),256, [1,255])
+            self.canvas.ax1.axvline(value, color = 'k', linestyle= 'dashed', linewidth=1)
+            self.canvas.draw()
+            self.slider.setSliderPosition(value)
+        except:
+            pass
+    
+    def set_thresh(self) -> int:
         '''
         This function closes the slider window once the user has chosen the
         threshold.
@@ -230,7 +417,7 @@ class SliderWindow(QtWidgets.QMainWindow):
         return self.slider.value()
 
 class TableWindow(QtWidgets.QMainWindow):
-    def __init__(self, dataframe, *args, **kwargs):
+    def __init__(self, dataframe: pd.DataFrame, *args, **kwargs):
         
         super().__init__(*args, **kwargs)
         self.widget = QtWidgets.QWidget()
@@ -257,9 +444,62 @@ class TableWindow(QtWidgets.QMainWindow):
         self.setWindowTitle("Result Dataframe")
         self.show()
 
+class WelcomeDialog(QtWidgets.QDialog):
+    def __init__(self, parent = None, *args, **kwargs):
+        super().__init__(parent)
+        location = os.path.dirname(os.path.realpath(__file__))
+        self.setWindowIcon(QtGui.QIcon(os.path.join(location, 'welcome_log2.png')))
+        self.setWindowTitle('Welcome')
+        
+        # Add the logo to the message box
+        logo_label = QtWidgets.QLabel()
+        logo_pixmap = QtGui.QPixmap(os.path.join(location, 'welcome_log2.png'))  # Replace "path/to/your/logo.png" with the actual path to your logo
+        logo_label.setPixmap(logo_pixmap)
+        logo_label.setAlignment(QtCore.Qt.AlignCenter)
+
+        # Add welcome message to the layout
+        welcome_label = QtWidgets.QLabel(self)
+        welcome_label.setText("Welcome to BAS!")
+        welcome_label.setAlignment(QtCore.Qt.AlignCenter)
+        
+        # Add instructions to the layout
+        instructions_label = QtWidgets.QLabel(self)
+        instructions_label.setText('Here are some brief instructions to get you started:\n1.'+
+                                   'Select the reference/blank well.\n2. Select the growth well.\n3.'+
+                                   'Select the geometry of the Region of Interest (ROI).\n4.'+
+                                   'Apply a manual crop to the ROI of each image.\n5. Select the color transformation option.\n6.'+ 
+                                   'Define the threshold value according to the blank histogram.\n7.'+
+                                   'Apply the manual thresholding.\n8. Obtain the results. \n9. Add the results to the csv file if satisfactory.')
+        instructions_label.setAlignment(QtCore.Qt.AlignCenter)   
+        #'<a href="https://github.com/your_username/your_repository">Click here to visit the GitHub repository</a>'
+        #Add link to the Github repo
+        link_label = QtWidgets.QLabel()
+        link_label.setText('For more information and detailed usage examples, please visit our '+
+                               '<a href="https://github.com/Biofilm-Project/BAS">GitHub repository</a>.')
+        link_label.setAlignment(QtCore.Qt.AlignCenter)
+        link_label.setOpenExternalLinks(True)
+        link_label.setTextInteractionFlags(QtCore.Qt.TextBrowserInteraction)
+        #self.info_box.addWidget(QtWidgets.QMessageBox.Ok)
+        
+        message_layout = QtWidgets.QVBoxLayout()
+        message_layout.addWidget(logo_label)
+        message_layout.addWidget(welcome_label)
+        message_layout.addWidget(instructions_label)
+        message_layout.addWidget(link_label)
+        #message_layout.addWidget(QtWidgets.QMessageBox.Ok)
+        
+        self.setLayout(message_layout)        
+
 class MainWindow(QtWidgets.QMainWindow):
-    def __init__(self, *args, **kwargs):
+    signal = QtCore.pyqtSignal(str)
+    def __init__(self, filename: str, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        
+        #Getting screen dimensions
+        screen = QtWidgets.QDesktopWidget().screenGeometry()
+        self.screen_width = screen.width()
+        self.screen_height= screen.height()
+        
         #Setting up font size
         font = QtGui.QFont()
         font.setPointSize(10)
@@ -267,7 +507,24 @@ class MainWindow(QtWidgets.QMainWindow):
         #Getting executable/main.py file location
         location = os.path.dirname(os.path.realpath(__file__))
         self.location = location.replace("\\","//") +"//"
-
+        
+        self.menubar = self.menuBar()
+        self.file_menu = self.menubar.addMenu('File')
+        self.data_menu = self.menubar.addMenu('Data')
+        self.help_menu = self.menubar.addMenu('Help')
+        
+        self.open_action = QtWidgets.QAction('Open csv file', self)
+        self.file_menu.addAction(self.open_action)
+        self.open_action.triggered.connect(self.open_file)
+        
+        self.showData_action = QtWidgets.QAction('Show Data', self)
+        self.showData_action.triggered.connect(self.show_dataframe)
+        self.data_menu.addAction(self.showData_action)
+        
+        self.getHelp_action = QtWidgets.QAction('Show B.A.S Instructions')
+        self.help_menu.addAction(self.getHelp_action)
+        self.getHelp_action.triggered.connect(self.open_HelpDialog)
+        
         #Settin up widgets --- Main UI
         self.choose_file = QtWidgets.QLabel("Choose Folder")
         self.choose_file.setFont(font)
@@ -338,12 +595,40 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ROI_button = QtWidgets.QPushButton("Crop Region of Interest")
         self.ROI_button.setFont(font)
 
+        self.auto_crop = QtWidgets.QPushButton('Automatic ROI Crop')
+        self.auto_crop.setFont(font)
+        
+        self.geometry_groupbox = QtWidgets.QGroupBox('Cropping Geometry Options')
+
+        self.square_radio = QtWidgets.QRadioButton("Square ROI")
+        self.square_radio.setFont(font)
+        self.square_radio.setChecked(False)
+        self.circular_radio = QtWidgets.QRadioButton("Circular ROI")
+        self.circular_radio.setFont(font)
+        self.circular_radio.setChecked(False)
+        
+        self.shape_box = QtWidgets.QHBoxLayout()
+        self.shape_box.addWidget(self.circular_radio)
+        self.shape_box.addWidget(self.square_radio)
+        
+        self.geometry_groupbox.setLayout(self.shape_box)
+        self.geometry_groupbox.setEnabled(False)
+        
+        self.color_groupbox = QtWidgets.QGroupBox('Color Transformation Options')
+        
         self.radio_green = QtWidgets.QRadioButton("Green")
         self.radio_green.setFont(font)
-        self.radio_green.setEnabled(False)
+        self.radio_green.setChecked(False)
         self.radio_gray = QtWidgets.QRadioButton("Gray")
         self.radio_gray.setFont(font)
-        self.radio_gray.setEnabled(False)
+        self.radio_green.setChecked(False)
+        
+        self.color_box = QtWidgets.QHBoxLayout()
+        self.color_box.addWidget(self.radio_green)
+        self.color_box.addWidget(self.radio_gray)
+        
+        self.color_groupbox.setLayout(self.color_box)
+        self.color_groupbox.setEnabled(False)
 
         self.next_step = QtWidgets.QPushButton("Confirm Color Scale")
         self.next_step.setFont(font)
@@ -354,20 +639,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.remove_button = QtWidgets.QPushButton('Apply Threshold')
         self.remove_button.setFont(font)
 
-        #self.result_button = QtWidgets.QPushButton("Show Results")
-        #self.result_button.setFont(font)
-
         self.add_button = QtWidgets.QPushButton("Add Result")
         self.add_button.setFont(font)
         
         self.state_label = QtWidgets.QLabel("... on file '___result.csv - currently 0 rows")
         self.state_label.setFont(font)
 
-        self.table_button = QtWidgets.QPushButton('Show csv file')
-        self.table_button.setFont(font)
-
-        #self.export_button = QtWidgets.QPushButton("Export Excel")
-        #self.export_button.setFont(font)
+        self.initial_round = True
 
         self.b_files = None
         self.c_files = None
@@ -375,6 +653,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.image = None
         self.image2 = None
+        
+        self.roi_window = None
+        self.roi_window2= None
 
         self.roi = None
         self.roi2 = None
@@ -413,8 +694,19 @@ class MainWindow(QtWidgets.QMainWindow):
         self.result_canvas = None
         self.toolbar = None
 
-        self.df = None
-        self.export_name = None
+        self.export_name = filename
+        self.new_file = None
+        self.previous_file_flag = False
+        
+        if os.stat(self.export_name).st_size>0:
+            #print('File with data')
+            self.df = pd.read_csv(self.export_name)
+            self.previous_file_flag=True
+        else:
+            #print('New file')
+            self.df = None
+            self.previous_file_flag = False
+        self.welcome_dialog = None
 
         self.export_list = list()
 
@@ -460,7 +752,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.right_box = QtWidgets.QVBoxLayout()
         self.second_right_box = QtWidgets.QVBoxLayout()
-        self.radio_box = QtWidgets.QHBoxLayout()
         
         self.right_box.addWidget(self.image_label)
         self.right_box.addWidget(self.filename_label)
@@ -478,6 +769,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.first_box.addLayout(self.second_right_box)
 
         self.second_box.addWidget(self.second_step)
+        self.second_box.addWidget(self.geometry_groupbox)
         self.second_box.addWidget(self.ROI_button)
         self.second_box.addWidget(self.image_label3)
         self.second_box.addWidget(self.new_ref_button)
@@ -489,10 +781,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.new_growth_button.setVisible(False)
 
         self.third_box.addWidget(self.third_step)
-        self.radio_box.addWidget(self.radio_green)
-        self.radio_box.addWidget(self.radio_gray)
-        self.radio_box.addStretch()
-        self.third_box.addLayout(self.radio_box)
+        self.third_box.addWidget(self.color_groupbox)
         self.third_box.addWidget(self.image_label5)
         self.third_box.addWidget(self.image_label6)
         self.third_box.addWidget(self.next_step)
@@ -508,20 +797,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self.remove_button.setEnabled(False)
 
         self.results_row = QtWidgets.QHBoxLayout()
-        #self.results_row.addWidget(self.result_button)
         self.results_row.addWidget(self.add_button)
         self.results_row.addWidget(self.state_label)
-        self.results_row.addWidget(self.table_button)
         self.state_label.setVisible(False)
-        self.table_button.setEnabled(False)
-        #self.results_row.addWidget(self.export_button)
         self.results_row.addStretch()
         
         self.fifth_box.addWidget(self.fifth_step)
         self.fifth_box.addLayout(self.results_row)        
-        #self.result_button.setEnabled(False)
         self.add_button.setEnabled(False)
-        #self.export_button.setEnabled(False)
         self.fifth_box.addStretch()
         
         self.top_box.addLayout(self.first_box)
@@ -544,11 +827,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.next_button2.clicked.connect(self.next_bio)
         self.radio_green.clicked.connect(self.show_scale)
         self.radio_gray.clicked.connect(self.show_scale)
-        #self.result_button.clicked.connect(self.show_results)
         self.remove_button.clicked.connect(self.execute_thresh)
         self.add_button.clicked.connect(self.add_result)
-        self.table_button.clicked.connect(self.show_dataframe)
-        #self.export_button.clicked.connect(self.export_results)
 
         self.layout = QtWidgets.QVBoxLayout()
         self.layout.addLayout(self.top_box)
@@ -556,11 +836,30 @@ class MainWindow(QtWidgets.QMainWindow):
         self.widget = QtWidgets.QWidget()
         self.widget.setLayout(self.layout)
         self.setCentralWidget(self.widget)
+        
+        self.setWindowIcon(QtGui.QIcon(os.path.join(location, 'welcome_log2.png')))
+        self.setWindowTitle('Biofilm Analysis Software')
 
-        self.setWindowTitle("B.A.S. Ver. 0.85")
-
-        #self.setFixedHeight(840)
         self.show()
+        self.centerWindow()
+        
+    def open_file(self):
+    
+        file, _ = QtWidgets.QFileDialog.getOpenFileName(self, "Select a file",
+                                                            os.path.dirname(os.path.abspath(__file__)),
+                                                            "Comma-separated values (*.csv)")
+        
+        
+        if file !='':
+            self.new_file = file
+            self.signal.emit('Change SecondWindow file')
+            self.close()
+            
+    def open_HelpDialog(self):
+    
+        self.welcome_dialog = WelcomeDialog()
+        self.welcome_dialog.exec_()
+            
     def get_image(self):
         '''
         Initial function in the Main UI that allows the user to choose a particular directory/folder for further analysis.
@@ -569,13 +868,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
         If the user chooses an empty directory or something alike, there'll be an error dialog with a set of instructions.        
         '''
-        
+        self.ref_index = 0
+        self.bio_index = 0
         directory = QtWidgets.QFileDialog.getExistingDirectory(self, "Select a folder", os.path.dirname(os.path.abspath(__file__)))
         if not directory=='':
             directory = directory.replace("/","//")
             self.directory = directory
             self.folders = [self.directory+'//'+folder for folder in os.listdir(self.directory) if folder[-4:]!='.txt']
-            #print(self.folders)
             if len(self.folders) == 0:
                 error_dialog = QtWidgets.QErrorMessage()
                 error_dialog.showMessage("Choose a folder with the correct distribution:"+"\n"+" 1) Biofilm 2) Reference")
@@ -604,14 +903,11 @@ class MainWindow(QtWidgets.QMainWindow):
                     self.previous_folder.setEnabled(True)
                     self.next_folder.setEnabled(True)
                     self.check_csv()
-                    
-                    #self.choose_button.setEnabled(False)
+                    self.geometry_groupbox.setEnabled(True)
+                    self.centerWindow()
 
     def check_csv(self):
         experimento= self.directory.split('//')[-1]
-        filename = r''+self.location+experimento+'_results.csv'
-        filename = filename.replace("//","\\")
-        self.export_name = filename
 
         try:
             self.df = pd.read_csv(self.export_name)
@@ -624,68 +920,132 @@ class MainWindow(QtWidgets.QMainWindow):
         self.state_label.setVisible(True)
         self.update_state_label(experimento, rows)
 
-    def update_state_label(self, exp, rows):
+    def update_state_label(self, exp: str, rows: int):
     
-        filename = exp+'_results.csv'
+        filename = self.export_name.split('/')[-1]
         if rows>1:
             end = 'rows'
         else:
             end = 'row'
         self.state_label.setText('... on file '+filename + ' - currently '+str(rows)+end)
-        self.table_button.setEnabled(True)
         
+    def show_roi_window(self, image_path: str, idd: int, crosshair_flag: bool, pair_flag: bool):#image, 
+        '''
+        Function to perform the manual crop in the image.
+
+        This crop has a circular shape as the ROI has that shape.
+        You select the borders of the ROI, and this function
+        obtains the coordinates of the selected radius. 
+        '''
+        if idd == 0:
+            self.roi_window = ROIWindow(image_path, crosshair_flag, "Reference Well", idd)
+            self.roi_window.coordinates_changed.connect(self.process_coordinates)
+            if pair_flag:
+                self.roi_window.window_closed.connect(self.show_next_roi_window)
+            self.roi_window.show()
+        else:
+            self.roi_window2 = ROIWindow(image_path, crosshair_flag, "Growth Well", idd)
+            self.roi_window2.coordinates_changed.connect(self.process_coordinates)
+            if pair_flag:
+                self.roi_window.window_closed.connect(self.show_next_roi_window)
+            self.roi_window2.show()
             
-    def select_roi(self, order):
+    def show_next_roi_window(self):
+        self.show_roi_window(self.c_files[self.bio_index], 1, True, False)
+    
+    def process_coordinates(self, rectangle: QtCore.QRect, circular_flag: bool, idd: int):
+        if rectangle is not None:
+            top_left = (rectangle.x(), rectangle.y())
+            bottom_right = (rectangle.x() + rectangle.width(), rectangle.y() + rectangle.height())
+            print('Top-left coordinates(X,Y):', top_left)
+            print('Bottom-right coordinates(X,Y):', bottom_right)
+            r = (rectangle.x(), rectangle.y(), rectangle.width(), rectangle.height())
+            if circular_flag:
+                if idd == 0:#ref
+                    img = cv2.cvtColor(np.array(self.image), cv2.COLOR_RGB2BGR)
+                else:#bio
+                    img = cv2.cvtColor(np.array(self.image2), cv2.COLOR_RGB2BGR)
+                just_roi = self.circular_crop(img, r)
+            else:
+                if idd == 0:
+                    img = cv2.cvtColor(np.array(self.image), cv2.COLOR_RGB2BGR)
+                else:
+                    img = cv2.cvtColor(np.array(self.image2), cv2.COLOR_RGB2BGR)
+                just_roi = self.square_crop(img, r)
+            roi_rgb = cv2.cvtColor(just_roi, cv2.COLOR_BGR2RGB)
+            self.update_one_ROI(idd+1, roi_rgb)
+            self.centerWindow()
+    
+    def circular_crop(self, img: np.ndarray, r: tuple[int, int, int, int]) -> np.ndarray:
+        cropped = img[int(r[1]):int(r[1]+r[3]), int(r[0]):int(r[0]+r[2])]
+        mask = np.zeros((cropped.shape[0],cropped.shape[1]), dtype = np.uint8)
+        shapes = cropped.shape
+        center = (shapes[1]//2 , shapes[0]//2)
+        rad = max(center)
+        blank_circle = cv2.circle(mask, center, rad, (255,0,0), -1)
+        result = cv2.bitwise_and(cropped, cropped, mask= mask)
+        return result
+    
+    def square_crop(self, img: np.ndarray, r: tuple[int, int, int, int]) -> np.ndarray:
+        cropped = img[int(r[1]):int(r[1]+r[3]), int(r[0]):int(r[0]+r[2])]
+        mask = np.ones((cropped.shape[0],cropped.shape[1]), dtype = np.uint8)
+        shapes = cropped.shape
+        result = cv2.bitwise_and(cropped, cropped, mask= mask)
+        return result
+
+    def select_roi(self, order: int):
         '''
         This function allows the manual segmentation of the ROI.
         It calls another function (selection) and return the coordinates of the ROI.
         Finally, it shows the result images in the main UI.
         '''
+
+        isCircular = self.circular_radio.isChecked()
+        isSquare = self.square_radio.isChecked()
+        
         if order == 0:
             #print(order)
             ref = cv2.cvtColor(np.array(self.image), cv2.COLOR_RGB2BGR)
             bio = cv2.cvtColor(np.array(self.image2), cv2.COLOR_RGB2BGR)
+            if self.initial_round == True:
+                QtWidgets.QMessageBox.about(self,"Warning Message", "1) You must press Enter once you have selected the region of interest."
+                                        +"\n"+"2) If you're unsure of the selection, you can press the 'Segment Well' Button again."
+                                        +"\n"+"3) Avoid closing the Segmentation Window or the main window without having made a selection, the program will close."
+                                        +"\n"+"4) You must segment both images to finish the process.")
 
-            QtWidgets.QMessageBox.about(self,"Warning Message", "1) You must press Enter once you have selected the region of interest."
-                                    +"\n"+"2) If you're unsure of the selection, you can press the 'Segment Well' Button again."
-                                    +"\n"+"3) Avoid closing the Segmentation Window or the main window without having made a selection, the program will close."
-                                    +"\n"+"4) You must segment both images to finish the process.")
+            if isCircular:
+                self.show_roi_window(self.b_files[self.ref_index], 0, True, True)
+            else:
+                self.show_roi_window(self.b_files[self.ref_index], 0, False, True)
         
-            just_ref = selection(ref,0)
-            just_bio = selection(bio,1)
-
-            ref_rgb = cv2.cvtColor(just_ref, cv2.COLOR_BGR2RGB)
-            bio_rgb = cv2.cvtColor(just_bio, cv2.COLOR_BGR2RGB)
-
-            self.update_ROI_pair([ref_rgb, bio_rgb], 2)
-        
-            self.radio_gray.setEnabled(True)
-            self.radio_green.setEnabled(True)
+            self.color_groupbox.setEnabled(True)
             self.next_step.setEnabled(True)
             self.new_ref_button.setVisible(True)
             self.new_growth_button.setVisible(True)
-            self.ROI_button.setEnabled(False)
+            self.ROI_button.setVisible(False)
             self.contador_ref = 1
         
             
         elif order == 1:
             
             image = cv2.cvtColor(np.array(self.image), cv2.COLOR_RGB2BGR)
-            just_ROI = selection(image,order-1)
-            ref_rgb = cv2.cvtColor(just_ROI, cv2.COLOR_BGR2RGB)
-            self.update_one_ROI(order, ref_rgb)
+            if isCircular:
+                self.show_roi_window(self.b_files[self.ref_index], order-1, True, False)
+            else:
+                self.show_roi_window(self.b_files[self.ref_index], order-1, False, False)
 
         else:
 
             image = cv2.cvtColor(np.array(self.image2), cv2.COLOR_RGB2BGR)
-            just_ROI = selection(image,order-1)
-            bio_rgb = cv2.cvtColor(just_ROI, cv2.COLOR_BGR2RGB)
-            self.update_one_ROI(order, bio_rgb)
+            if isCircular:
+                self.show_roi_window(self.c_files[self.bio_index], order-1, True, False)
+            else:
+                self.show_roi_window(self.c_files[self.bio_index], order-1, False, False)
 
         self.second_step.setStyleSheet("border: 1px solid black")
         self.third_step.setStyleSheet("background-color: lightgreen; border: 1px solid black")
         #Show scale
-        self.show_scale()
+        #self.show_scale()
         
     def show_scale(self):
         '''
@@ -709,7 +1069,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.update_ROI_pair([color, color2], 3)
 
-    def update_one_ROI(self, order, image):
+    def update_one_ROI(self, order: int, image: np.ndarray):
         if order == 1:
             self.roi = Image.fromarray(image)
             roi_qt = ImageQt.ImageQt(self.roi)
@@ -725,7 +1085,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.image_label4.setPixmap(self.roi_map2)
             
 
-    def update_ROI_pair(self, imgs, col=2):
+    def update_ROI_pair(self, imgs: list[np.ndarray, np.ndarray], col: int=2):
         '''
         This function updates both cropped images from the second and third step.
         '''
@@ -758,8 +1118,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.image_label5.setPixmap(self.conv_map)
             self.image_label6.setPixmap(self.conv_map2)
 
-
-        
     def selecting_color(self):
         '''
         This function enables the thresholding button, once the user has decided
@@ -810,6 +1168,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.image_color = np.array(self.roi)[:,:,1]
             self.image_color2 = np.array(self.roi2)[:,:,1]
             self.show_results()
+        self.centerWindow()
         
     def show_results(self):
         '''
@@ -856,13 +1215,17 @@ class MainWindow(QtWidgets.QMainWindow):
         self.result_canvas.ax3 = self.result_canvas.fig.add_subplot(223)
         self.result_canvas.ax4 = self.result_canvas.fig.add_subplot(224)
 
-        self.result_canvas.ax1.imshow(res_wh)
+        self.result_canvas.ax1.imshow(res_wh, cmap='plasma')
+        self.result_canvas.ax1.xaxis.set_tick_params(labelbottom=False)
+        self.result_canvas.ax1.yaxis.set_tick_params(labelleft=False)
         self.result_canvas.ax1.title.set_text("Reference")
         self.result_canvas.ax2.hist(self.image_color.ravel(),255,[1,255])
         self.result_canvas.ax2.axvline(self.threshold, color = 'k', linestyle = 'dashed', linewidth=1)
         text_ax2 = 'Mass Center: %.3f'%wh_mean
         self.result_canvas.ax2.title.set_text(text_ax2)
-        self.result_canvas.ax3.imshow(res)
+        self.result_canvas.ax3.imshow(res, cmap='plasma')
+        self.result_canvas.ax3.xaxis.set_tick_params(labelbottom=False)
+        self.result_canvas.ax3.yaxis.set_tick_params(labelleft=False)
         self.result_canvas.ax4.hist(self.image_color2.ravel(), 255, [1,255])
         self.result_canvas.ax4.axvline(self.threshold, color = 'k', linestyle = 'dashed', linewidth=1)
         self.result_canvas.ax3.title.set_text("Biofilm")
@@ -871,6 +1234,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.result_canvas.ax4.title.set_text(showing_text+"%" + "  "+text_ax4)
         self.fifth_box.addStretch()
         self.result_canvas.draw()
+        self.result_canvas.fig.tight_layout()
 
         self.temp = list()
 
@@ -880,12 +1244,20 @@ class MainWindow(QtWidgets.QMainWindow):
         
         self.temp = [self.just_c_filename[self.bio_index][0], name.split('_')[0][1:], self.just_c_filename[self.bio_index],self.just_b_filename[self.ref_index], self.color_selection, self.threshold, percentage, global_mean, global_median, res_mean,res_median,global_skew,global_kurt, today]
 
-        self.setFixedWidth(2220)
+        self.setFixedWidth(int(self.screen_width*0.95))
+        self.centerWindow()
         
         self.radio_gray.setEnabled(True)
         self.radio_green.setEnabled(True)
         self.add_button.setEnabled(True)
         #self.export_button.setEnabled(True)
+        
+    def centerWindow(self):
+        # Center the window on the screen
+        qr = self.frameGeometry()
+        cp = QtWidgets.QDesktopWidget().availableGeometry().center()
+        qr.moveCenter(cp)
+        self.move(qr.topLeft())
 
     def add_result(self):
         '''
@@ -899,10 +1271,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.df.columns = ['Row', 'Column', 'File', 'Control File', 'Color', 'Thresh', 'Prop', 'Global Mean', 'Global Median', 'Bio Mean', 'Bio Median', 'Global Skew', 'Global Kurt', 'Date']
         self.update_state_label(self.directory.split('//')[-1], self.df.shape[0])
         self.export_results()
-        
-        QtWidgets.QMessageBox.about(self,"Notification","The values have already been added to the .csv file, Change to another well of your choice."
-                                    +"\n"+"Please follow the same step order as you have done, going from left to right."
-                                    +"\n"+"Do not skip any step.")
+
+        if self.initial_round == True:
+            QtWidgets.QMessageBox.about(self,"Notification","The values have already been added to the .csv file, Change to another well of your choice."
+                                        +"\n"+"Please follow the same step order as you have done, going from left to right."
+                                        +"\n"+"Do not skip any step.")
 
     def export_results(self):
         '''
@@ -910,25 +1283,21 @@ class MainWindow(QtWidgets.QMainWindow):
         The export location will be the same directory of the BAS_ver6.py or .exe for ease of location.
         '''
 
-        experimento= self.directory.split('//')[-1]
-        filename = r''+self.location+experimento+'_results.csv'
-        filename = filename.replace("//","\\")
-        self.export_name = filename
+        self.df.to_csv(self.export_name, index=False, header=True)
 
-        self.df.to_csv(filename, index=False, header=True)
-
-        
-        QtWidgets.QMessageBox.about(self,"Notification","The file have been exported, is located in the executable folder"
-                                    +"\n"+"It follows this format: Experiment_folder_name + _results.csv"
-                                    "\n"+"Overwrites any other file with the same filename, be careful.")
-
-    def show_dataframe(self):
-
-        self.table_window = TableWindow(self.df)
-        self.table_window.show()
-        
+        if self.initial_round == True:
+            QtWidgets.QMessageBox.about(self,"Notification","The file have been exported"+
+                                        "\n"+"Overwrites any other file with the same filename, be careful.")
+            self.initial_round == False
     
-    def update_image_label(self, file, ref=False):
+    def show_dataframe(self):
+        try:
+            self.table_window = TableWindow(self.df)
+            self.table_window.show()
+        except:
+            pass
+    
+    def update_image_label(self, file: str, ref: bool=False):
         '''
         This function updates both images of the first step (image exploration) and allows the user to
         freely choose the image of interest (reference and biofilm).
@@ -1009,6 +1378,6 @@ class MainWindow(QtWidgets.QMainWindow):
 if __name__ == '__main__':
 
     app = QtWidgets.QApplication(sys.argv)
-    w = MainWindow()
+    main_widget = ScreenHandler()
     app.exec_()
 
